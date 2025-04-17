@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Clone your actual repo content into the container
 RUN git clone https://github.com/arrfonseca/evolution-manager.git .
+RUN ln -s /usr/local/bin/node /usr/bin/node
 
 # Install deps
 RUN npm install
