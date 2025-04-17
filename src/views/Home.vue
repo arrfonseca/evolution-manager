@@ -20,19 +20,15 @@
         :disabled="loading"
       >
         <v-icon>mdi-plus</v-icon>
-        <span class="ml-2">
-          {{ $t("instance") }}
-        </span>
+        <span class="ml-2">{{ $t("instance") }}</span>
       </v-btn>
     </div>
 
     <v-row dense>
       <v-col cols="12" v-if="loading">
-        <v-progress-linear v-if="loading" indeterminate color="info" />
-        <v-alert type="info" class="mb-4" v-else :loading="loading" outlined>
-          {{ $t("loading") }}...
-        </v-alert>
+        <v-progress-linear indeterminate color="info" />
       </v-col>
+
       <v-col v-else cols="12">
         <div class="d-flex gap-2 flex-wrap mb-2">
           <v-text-field
@@ -51,11 +47,10 @@
             <v-btn
               :value="false"
               :disabled="loading"
-              :loading="loading"
               variant="outlined"
               size="x-small"
             >
-              {{$t("all")}}
+              {{ $t("all") }}
             </v-btn>
             <v-btn
               v-for="[key, item] in Object.entries(statusMapper)"
@@ -63,25 +58,25 @@
               :value="key"
               :color="item.color"
               :disabled="loading"
-              :loading="loading"
               variant="outlined"
               size="x-small"
             >
-            {{ $t(`status.${key}`) }}
+              {{ $t(`status.${key}`) }}
             </v-btn>
           </v-btn-toggle>
         </div>
       </v-col>
-      <template v-if="filteredInstances.length !== 0">
+
+      <template v-if="filteredInstances.length">
         <v-col
           cols="12"
           sm="6"
           lg="4"
-          v-for="{ instance } in filteredInstances"
-          :key="instance.instanceName"
+          v-for="item in filteredInstances"
+          :key="item.instance?.instanceName || item.id"
         >
           <v-card
-            @click="goToInstance(instance)"
+            @click="goToInstance(item.instance)"
             class="pa-2 rounded-lg"
             variant="outlined"
             :disabled="loading"
@@ -89,33 +84,37 @@
             <div class="d-flex align-center gap-2">
               <v-avatar size="50">
                 <v-img
-                  v-if="instance.profilePictureUrl"
-                  :src="instance.profilePictureUrl"
+                  v-if="item.instance?.profilePictureUrl"
+                  :src="item.instance.profilePictureUrl"
                 />
-                <v-icon v-else>{{ statusMapper[instance.status].icon }}</v-icon>
+                <v-icon v-else>
+                  {{ statusMapper[item.instance?.status]?.icon || 'mdi-alert' }}
+                </v-icon>
               </v-avatar>
+
               <div class="flex-shrink-1">
                 <v-chip
-                  :color="statusMapper[instance.status].color"
+                  :color="statusMapper[item.instance?.status]?.color || 'grey'"
                   size="x-small"
                   label
                 >
                   <v-icon
-                    v-if="statusMapper[instance.status].icon"
+                    v-if="statusMapper[item.instance?.status]?.icon"
                     start
                     size="x-small"
                   >
-                    {{ statusMapper[instance.status].icon }}
+                    {{ statusMapper[item.instance?.status].icon }}
                   </v-icon>
-                  {{ $t(`status.${instance.status}`) }}
+                  {{ $t(`status.${item.instance?.status}`) }}
                 </v-chip>
-                <h5>{{ instance.instanceName }}</h5>
+                <h5>{{ item.instance?.instanceName || "Sem nome" }}</h5>
               </div>
+
               <div class="ml-auto flex-shrink-0">
                 <v-btn
                   :disabled="loading || !!loadingDelete"
-                  :loading="loadingDelete === instance.instanceName"
-                  @click.stop="deleteInstance(instance.instanceName)"
+                  :loading="loadingDelete === item.instance?.instanceName"
+                  @click.stop="deleteInstance(item.instance?.instanceName)"
                   icon
                   variant="tonal"
                   color="error"
@@ -128,17 +127,20 @@
           </v-card>
         </v-col>
       </template>
+
       <v-col v-else cols="12">
         <v-alert type="info" class="mb-4" outlined>
           {{ $t("noInstances") }}
         </v-alert>
       </v-col>
     </v-row>
+
     <v-alert v-if="error" type="error">
       {{ error }}
     </v-alert>
+
+    <CreateInstance ref="createInstanceModal" />
   </div>
-  <CreateInstance ref="createInstanceModal" />
 </template>
 
 <script>
@@ -149,15 +151,13 @@ import instanceController from "@/services/instanceController";
 
 export default {
   name: "HomeInstance",
-  components: {
-    CreateInstance,
-  },
+  components: { CreateInstance },
   data: () => ({
     AppStore: useAppStore(),
     loadingInner: false,
     loadingDelete: false,
     error: false,
-    statusMapper: statusMapper,
+    statusMapper,
     statusFilter: false,
     search: "",
   }),
@@ -166,10 +166,8 @@ export default {
       this.$refs.createInstanceModal.open();
     },
     goToInstance(instance) {
-      this.$router.push({
-        name: "instance",
-        params: { id: instance.instanceName },
-      });
+      if (!instance || !instance.instanceName) return;
+      this.$router.push({ name: "instance", params: { id: instance.instanceName } });
     },
     async deleteInstance(instanceName) {
       try {
@@ -178,7 +176,6 @@ export default {
           `Tem certeza que deseja excluir a instância ${instanceName}?`
         );
         if (!confirm) return;
-
         await instanceController.logout(instanceName).catch(() => {});
         await instanceController.delete(instanceName);
         await this.AppStore.reconnect();
@@ -199,7 +196,6 @@ export default {
       }
     },
   },
-  watch: {},
   computed: {
     loading() {
       return this.loadingInner || this.AppStore.connecting;
@@ -208,24 +204,21 @@ export default {
       return this.AppStore.instances;
     },
     filteredInstances() {
-      const instances = this.instances.filter((instance) => {
-        if (!this.statusFilter) return true;
-        return instance.instance.status === this.statusFilter;
-      });
-
-      if (!this.search) return instances;
-      return instances.filter((instance) => {
-        const search = this.search.trim().toLowerCase();
-
-        return (
-          (instance.instance.instanceName || "")
-            .toLowerCase()
-            .includes(search) ||
-          (instance.instance.owner || "").toLowerCase().includes(search)
-        );
-      });
+      return this.instances
+        .filter((item) => item?.instance?.instanceName)
+        .filter((item) => {
+          if (!this.statusFilter) return true;
+          return item.instance.status === this.statusFilter;
+        })
+        .filter((item) => {
+          if (!this.search) return true;
+          const search = this.search.trim().toLowerCase();
+          return (
+            (item.instance.instanceName || "").toLowerCase().includes(search) ||
+            (item.instance.owner || "").toLowerCase().includes(search)
+          );
+        });
     },
   },
-  mounted() {},
 };
 </script>
