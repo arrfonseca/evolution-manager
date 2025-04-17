@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "lint": "eslint . --fix --ignore-path .gitignore",
     "prepare": "node ./lib/postinstall.js"
+    "start": "node ./bin/evolution-manager server start"
   },
   "directories": {
     "bin": "./bin"
