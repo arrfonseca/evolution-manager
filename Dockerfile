@@ -1,5 +1,7 @@
 FROM node:20-slim
 
+ARG CACHE_BREAKER=1  # 👈 Add this line to bust cache
+
 WORKDIR /usr/src/app
 
 # Make sure node is available
