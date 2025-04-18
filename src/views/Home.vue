@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="d-flex mb-4 align-center">
-      <h3>{{ $t("instance", 2) }}</h3>
+      <h3>{{ $t("instance", 2) }} ✅</h3>
       <v-spacer></v-spacer>
       <v-btn
         :disabled="loading"
